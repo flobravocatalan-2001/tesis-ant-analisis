@@ -21,7 +21,6 @@ install.packages("coin")
 library(coin)
 library(rstatix)  # cargado DESPUÉS de coin, así sus funciones tienen prioridad
 library(tidyverse)
-library(rstatix)
 library(ggpubr)
 
 
@@ -154,5 +153,5 @@ grafico <- ggplot(datos_prs, aes(x = momento, y = prs_total, fill = grupo)) +
   theme(legend.position = "top")
 
 print(grafico)
-ggsave("grafico_PRS.png", grafico, width = 7, height = 5, dpi = 300)
+#ggsave("grafico_PRS.png", grafico, width = 7, height = 5, dpi = 300)
 
