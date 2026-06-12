@@ -122,13 +122,6 @@ print(ef_experimental)
 # ---- 7. MANN-WHITNEY ----------------------------------------
 # Compara control vs experimental en cada momento por separado.
 
-# Mann-Whitney especificando el paquete rstatix
-mann_whitney <- datos_prs %>%
-  group_by(momento) %>%
-  rstatix::wilcox_test(prs_total ~ grupo) %>%
-  add_significance()
-print(mann_whitney)
-
 cat("\n=== MANN-WHITNEY: CONTROL vs EXPERIMENTAL POR MOMENTO ===\n")
 mann_whitney <- datos_prs %>%
   group_by(momento) %>%
