@@ -42,10 +42,7 @@ library(car)
 library(coin)
 library(rstatix)
 library(ggpubr)
-library(lme4)
-library(lmerTest)
-library(emmeans)
-library(MuMIn)
+
 
 # ---- 2. CARGAR DATOS ----------------------------------------
 setwd("C:/Users/HP/Documents/TESIS ANT/ANT/Conductuales ANT")
@@ -290,7 +287,7 @@ for (r in c("alerta", "orientacion", "control")) {
 }
 
 
-# ---- 9. LMM: TIEMPO × GRUPO (reemplaza ANOVA mixto) --------
+# ---- 9. Linear Mixed Models: TIEMPO × GRUPO --------------------------------
 cat("\n=== MODELOS MIXTOS LINEALES (LMM): TIEMPO × GRUPO ===\n")
 cat("Reporta: F, gl, p\n\n")
 
