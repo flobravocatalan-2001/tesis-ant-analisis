@@ -42,7 +42,10 @@ library(car)
 library(coin)
 library(rstatix)
 library(ggpubr)
-
+library(lme4)
+library(lmerTest)
+library(emmeans)
+library(MuMIn)
 
 # ---- 2. CARGAR DATOS ----------------------------------------
 setwd("C:/Users/HP/Documents/TESIS ANT/ANT/Conductuales ANT")
@@ -375,7 +378,7 @@ redes_largas_sinS13 %>%
             n = n(), .groups="drop") %>%
   print()
 
-cat("\nANOVA alerta sin S13:\n")
+cat("\nLMM alerta sin S13:\n")
 base_alerta_sinS13 <- redes_largas_sinS13 %>%
   filter(red == "alerta", !is.na(indice)) %>%
   group_by(sujeto) %>% filter(n() == 2) %>% ungroup() %>%
