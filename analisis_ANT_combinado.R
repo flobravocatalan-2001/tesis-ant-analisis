@@ -432,29 +432,25 @@ accuracy %>%
             M_err  = round(mean(errores), 1),
             .groups = "drop") %>% print()
 
-cat("\n=== ANOVA MIXTO — RT GLOBAL ===\n")
-anova_rt <- ezANOVA(
-  data = rt_global %>%
-    mutate(sujeto = factor(sujeto), grupo = factor(grupo),
-           tiempo = factor(tiempo, levels = c("pre","post"))),
-  dv = .(rt_medio), wid = .(sujeto),
-  within = .(tiempo), between = .(grupo),
-  detailed = TRUE, type = 3
-)
-print(anova_rt$ANOVA %>% select(Effect, F, p, ges) %>%
-        mutate(across(c(F, p, ges), ~ round(.x, 4))))
+cat("\n=== LMM — RT GLOBAL ===\n")
+modelo_rt <- lmer(rt_medio ~ tiempo * grupo + (1 | sujeto),
+                  data = rt_global %>%
+                    mutate(sujeto = factor(sujeto),
+                           grupo  = factor(grupo),
+                           tiempo = factor(tiempo, levels = c("pre","post"))))
+print(anova(modelo_rt, type = 3))
+cat("R² marginal:", round(MuMIn::r.squaredGLMM(modelo_rt)[1], 4), "\n")
+cat("R² condicional:", round(MuMIn::r.squaredGLMM(modelo_rt)[2], 4), "\n")
 
-cat("\n=== ANOVA MIXTO — ACCURACY ===\n")
-anova_acc <- ezANOVA(
-  data = accuracy %>%
-    mutate(sujeto = factor(sujeto), grupo = factor(grupo),
-           tiempo = factor(tiempo, levels = c("pre","post"))),
-  dv = .(accuracy), wid = .(sujeto),
-  within = .(tiempo), between = .(grupo),
-  detailed = TRUE, type = 3
-)
-print(anova_acc$ANOVA %>% select(Effect, F, p, ges) %>%
-        mutate(across(c(F, p, ges), ~ round(.x, 4))))
+cat("\n=== LMM — ACCURACY ===\n")
+modelo_acc <- lmer(accuracy ~ tiempo * grupo + (1 | sujeto),
+                   data = accuracy %>%
+                     mutate(sujeto = factor(sujeto),
+                            grupo  = factor(grupo),
+                            tiempo = factor(tiempo, levels = c("pre","post"))))
+print(anova(modelo_acc, type = 3))
+cat("R² marginal:", round(MuMIn::r.squaredGLMM(modelo_acc)[1], 4), "\n")
+cat("R² condicional:", round(MuMIn::r.squaredGLMM(modelo_acc)[2], 4), "\n")
 
 
 # ---- 13. GRÁFICO -------------------------------------------
