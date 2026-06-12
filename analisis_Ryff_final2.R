@@ -250,6 +250,6 @@ print(fig2a)
 print(fig2b)
 
 # Para guardar en alta resolución:
-ggsave("Fig1_Ryff_total.png",          fig1,  width = 7, height = 5, dpi = 300)
-ggsave("Fig2a_Ryff_subescalas.png",    fig2a, width = 10, height = 7, dpi = 300)
-ggsave("Fig2b_Ryff_crec_personal.png", fig2b, width = 5, height = 4, dpi = 300)
+#ggsave("Fig1_Ryff_total.png",          fig1,  width = 7, height = 5, dpi = 300)
+#ggsave("Fig2a_Ryff_subescalas.png",    fig2a, width = 10, height = 7, dpi = 300)
+#ggsave("Fig2b_Ryff_crec_personal.png", fig2b, width = 5, height = 4, dpi = 300)
