@@ -147,26 +147,3 @@ print(grafico)
 
 # Para guardar el gráfico, descomentar:
 # ggsave("grafico_PSS.png", grafico, width = 8, height = 5, dpi = 300)
-
-# Cargar el archivo completo con todos los ítems
-pss_completo <- read.csv("C:/Users/HP/Documents/TESIS ANT/Cuestionarios/PSS/PSS_estres_percibido_scored.csv")
-
-library(tidyverse)
-
-pss_completo <- read.csv("C:/Users/HP/Documents/TESIS ANT/Cuestionarios/PSS/PSS_estres_percibido_scored.csv")
-
-pss_completo %>%
-  filter(ID == 7) %>%
-  select(ID, momento,
-         pss_1_orig, pss_1,
-         pss_2_orig, pss_2,
-         pss_3_orig, pss_3,
-         pss_4_orig, pss_4,
-         pss_5_orig, pss_5,
-         pss_6_orig, pss_6,
-         pss_7_orig, pss_7,
-         pss_8_orig, pss_8,
-         pss_9_orig, pss_9,
-         pss_10_orig, pss_10,
-         pss_total)
-
