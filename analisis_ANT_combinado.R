@@ -17,8 +17,8 @@
 #   3. Detección y exclusión de sujetos problemáticos
 #   4. Estadísticos descriptivos
 #   5. Verificación de supuestos (normalidad + Levene)
-#   6. ANOVA mixto (tiempo × grupo)
-#   7. Post-hoc Wilcoxon
+#   6. Modelos Mixtos Lineales - LMM (tiempo × grupo)
+#   7. Post-hoc con medias marginales estimadas (emmeans)
 #   8. Análisis de sensibilidad sin S13
 #   9. RT global y accuracy
 #  10. Gráficos
@@ -287,7 +287,6 @@ for (r in c("alerta", "orientacion", "control")) {
 }
 
 
-# ---- 9. ANOVA MIXTO -----------------------------------------
 # ---- 9. LMM: TIEMPO × GRUPO (reemplaza ANOVA mixto) --------
 cat("\n=== MODELOS MIXTOS LINEALES (LMM): TIEMPO × GRUPO ===\n")
 cat("Reporta: F, gl, p\n\n")
@@ -383,15 +382,13 @@ base_alerta_sinS13 <- redes_largas_sinS13 %>%
   mutate(sujeto = factor(sujeto), grupo = factor(grupo),
          tiempo = factor(tiempo, levels = c("pre","post")))
 
-anova_alerta_sinS13 <- ezANOVA(
-  data = base_alerta_sinS13,
-  dv = .(indice), wid = .(sujeto),
-  within = .(tiempo), between = .(grupo),
-  detailed = TRUE, type = 3
-)
-print(anova_alerta_sinS13$ANOVA %>%
-        select(Effect, F, p, ges) %>%
-        mutate(across(c(F, p, ges), ~ round(.x, 4))))
+modelo_sinS13 <- lmer(indice ~ tiempo * grupo + (1 | sujeto),
+                      data = base_alerta_sinS13)
+
+print(anova(modelo_sinS13, type = 3))
+
+cat("R² marginal:", round(MuMIn::r.squaredGLMM(modelo_sinS13)[1], 4), "\n")
+cat("R² condicional:", round(MuMIn::r.squaredGLMM(modelo_sinS13)[2], 4), "\n")
 
 
 # ---- 12. RT GLOBAL Y ACCURACY ------------------------------
