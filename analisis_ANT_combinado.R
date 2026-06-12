@@ -28,7 +28,12 @@
 # ---- 1. PAQUETES --------------------------------------------
 # Descomentar la primera vez:
 # install.packages(c("tidyverse", "readr", "janitor", "ez", "car", "rstatix", "ggpubr", "coin"))
-
+install.packages(c("lme4", "lmerTest", "emmeans"))
+install.packages("MuMIn")
+library(MuMIn)
+library(lme4)
+library(lmerTest)
+library(emmeans)
 library(tidyverse)
 library(readr)
 library(janitor)
@@ -239,6 +244,37 @@ redes_largas %>%
   select(grupo, tiempo, red, statistic, p) %>%
   print(n = 30)
 
+etiquetas_red <- c(
+  alerta      = "Alerta\n(no cue − double cue)",
+  orientacion = "Orientación\n(center − spatial)",
+  control     = "Control ejecutivo\n(incongruent − congruent)"
+)
+
+
+# Histograma con curva normal superpuesta
+redes_largas %>%
+  ggplot(aes(x = indice * 1000)) +  # *1000 para convertir a ms
+  geom_histogram(aes(y = after_stat(density)), 
+                 bins = 15, 
+                 fill = "#4A90D9", 
+                 color = "white",
+                 alpha = 0.7) +
+  stat_function(fun = dnorm,
+                args = list(
+                  mean = mean(redes_largas$indice * 1000, na.rm = TRUE),
+                  sd   = sd(redes_largas$indice * 1000, na.rm = TRUE)
+                ),
+                color = "red", linewidth = 1) +
+  facet_grid(grupo + tiempo ~ red,
+             labeller = labeller(red = etiquetas_red)) +
+  labs(
+    title = "Distribución de índices ANT por grupo y momento",
+    x     = "Índice atencional (ms)",
+    y     = "Densidad"
+  ) +
+  theme_pubr() +
+  theme(strip.text = element_text(size = 8))
+
 cat("\n=== HOMOGENEIDAD DE VARIANZAS (Levene) ===\n")
 for (r in c("alerta", "orientacion", "control")) {
   cat(paste0("--- ", r, " ---\n"))
@@ -252,69 +288,66 @@ for (r in c("alerta", "orientacion", "control")) {
 
 
 # ---- 9. ANOVA MIXTO -----------------------------------------
-cat("\n=== ANOVA MIXTO: TIEMPO × GRUPO ===\n")
-cat("Reporta: F, p, ges (eta cuadrado generalizado)\n\n")
+# ---- 9. LMM: TIEMPO × GRUPO (reemplaza ANOVA mixto) --------
+cat("\n=== MODELOS MIXTOS LINEALES (LMM): TIEMPO × GRUPO ===\n")
+cat("Reporta: F, gl, p\n\n")
 
 for (r in c("alerta", "orientacion", "control")) {
   cat(paste0("--- ", toupper(r), " ---\n"))
-
+  
   base <- redes_largas %>%
     filter(red == r, !is.na(indice)) %>%
     group_by(sujeto) %>%
     filter(n() == 2) %>%
     ungroup() %>%
-    mutate(sujeto = factor(sujeto),
-           grupo  = factor(grupo),
-           tiempo = factor(tiempo, levels = c("pre", "post")))
-
-  anova_res <- ezANOVA(
-    data     = base,
-    dv       = .(indice),
-    wid      = .(sujeto),
-    within   = .(tiempo),
-    between  = .(grupo),
-    detailed = TRUE,
-    type     = 3
-  )
-
-  print(anova_res$ANOVA %>%
-          select(Effect, F, p, ges) %>%
-          mutate(across(c(F, p, ges), ~ round(.x, 4))))
-  cat("\n")
+    mutate(
+      sujeto = factor(sujeto),
+      grupo  = factor(grupo),
+      tiempo = factor(tiempo, levels = c("pre", "post"))
+    )
+  
+  # El modelo:
+  # indice ~ tiempo * grupo  → queremos saber si hay efecto de tiempo,
+  #                             de grupo, y si interactúan entre sí
+  # (1 | sujeto)             → cada persona tiene su propio punto de partida
+  
+  modelo <- lmer(indice ~ tiempo * grupo + (1 | sujeto), data = base)
+  
+  # Tabla de resultados con valores F y p
+  print(anova(modelo, type = 3))
+  
+  # Tamaño del efecto (r²)
+  cat("R² marginal (solo efectos fijos):",
+      round(MuMIn::r.squaredGLMM(modelo)[1], 4), "\n")
+  cat("R² condicional (modelo completo):",
+      round(MuMIn::r.squaredGLMM(modelo)[2], 4), "\n\n")
 }
 
 
-# ---- 10. POST-HOC: WILCOXON PAREADO -------------------------
-cat("=== POST-HOC: WILCOXON PAREADO POR GRUPO ===\n")
-cat("(solo para redes con efecto significativo de tiempo)\n\n")
+# ---- 10. POST-HOC CON LMM -----------------------------------
+cat("=== POST-HOC: COMPARACIONES PRE vs POST POR GRUPO ===\n\n")
 
 for (r in c("alerta", "orientacion", "control")) {
   cat(paste0("--- ", toupper(r), " ---\n"))
-
+  
   base <- redes_largas %>%
     filter(red == r, !is.na(indice)) %>%
     group_by(sujeto) %>%
     filter(n() == 2) %>%
-    ungroup()
-
-  for (g in c("control", "experimental")) {
-    sub <- base %>%
-      filter(grupo == g) %>%
-      mutate(sujeto = droplevels(factor(sujeto)))
-
-    w <- sub %>%
-      rstatix::wilcox_test(indice ~ tiempo, paired = TRUE) %>%
-      add_significance()
-    e <- sub %>%
-      wilcox_effsize(indice ~ tiempo, paired = TRUE)
-
-    cat(sprintf("  %-14s W = %.1f, p = %.4f %s, r = %.3f (%s)\n",
-                g, w$statistic, w$p, w$p.signif,
-                e$effsize, e$magnitude))
-  }
+    ungroup() %>%
+    mutate(
+      sujeto = factor(sujeto),
+      grupo  = factor(grupo),
+      tiempo = factor(tiempo, levels = c("pre", "post"))
+    )
+  
+  modelo <- lmer(indice ~ tiempo * grupo + (1 | sujeto), data = base)
+  
+  # Comparar PRE vs POST dentro de cada grupo por separado
+  comparaciones <- emmeans(modelo, ~ tiempo | grupo)
+  print(pairs(comparaciones, adjust = "bonferroni"))
   cat("\n")
 }
-
 
 # ---- 11. ANÁLISIS DE SENSIBILIDAD SIN S13 -------------------
 # S13 tiene alerta = 0.735 en PRE (outlier extremo que infla
