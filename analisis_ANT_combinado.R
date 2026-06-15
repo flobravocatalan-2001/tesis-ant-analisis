@@ -45,7 +45,7 @@ library(ggpubr)
 
 
 # ---- 2. CARGAR DATOS ----------------------------------------
-setwd("C:/Users/HP/Documents/TESIS ANT/ANT/Conductuales ANT")
+setwd("C:/Users/HP/Documents/TESIS ANT/ANT/Conductuales/ANT")
 
 archivos <- list.files(pattern = "\\.csv$")
 
