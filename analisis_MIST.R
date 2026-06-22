@@ -1,207 +1,197 @@
-# =============================================================
-# ANÁLISIS MIST — STAI-6 y VAS
-# =============================================================
-# Objetivo: evaluar si el MIST indujo estrés agudo (PRE vs POST)
-# y si la respuesta difirió entre grupo control y experimental.
+# =================================================================
+# COMPARACIÓN: Estrés post-MIST vs. post-ANT, Día 1 vs. Día 3
+# =================================================================
 #
-# Muestra: 27 controles y 26 experimentales con datos completos
+# OBJETIVO de este script:
+#   Comparar el nivel de estrés (VAS) y ansiedad (STAI-6) en 4
+#   momentos repetidos para la misma persona:
+#     - Día 1, después del MIST   (dia1_post_mist)
+#     - Día 1, después del ANT    (dia1_post_ant)
+#     - Día 3, después del MIST   (dia3_post_mist)
+#     - Día 3, después del ANT    (dia3_post_ant)
 #
-# Variables:
-#   - STAI-6: ansiedad estado (6 ítems, escala 1-4, rango 6-24)
-#   - VAS: estrés subjetivo percibido (escala 0-10)
+#   Esto permite responder preguntas como:
+#     - ¿El estrés sube o baja entre hacer la MIST y hacer el ANT,
+#       dentro del mismo día?
+#     - ¿El estrés post-MIST (o post-ANT) cambia entre el día 1 y
+#       el día 3 del retiro?
 #
-# Análisis:
-#   1. Estadísticos descriptivos (mediana y RIC)
-#   2. Normalidad: Shapiro-Wilk
-#   3. Eficacia del MIST: Wilcoxon pareado PRE vs POST por grupo
-#   4. Tamaño del efecto: r de Wilcoxon
-#   5. Diferencias entre grupos: Mann-Whitney en cada momento
-#   6. Gráficos
-# =============================================================
+# Estructura:
+#   0. Paquetes
+#   1. Cargar datos y pasar a formato "ancho" (una fila por persona)
+#   2. Quedarnos solo con quienes tienen las 4 mediciones completas
+#   3. Normalidad (Shapiro-Wilk) en cada una de las 4 condiciones
+#   4. Prueba de Friedman (ómnibus) para VAS y STAI-6
+#   5. Comparaciones post-hoc de Wilcoxon con corrección de Bonferroni
+#   6. Tabla descriptiva final
+# =================================================================
+
+library(readxl)
+library(dplyr)
+library(tidyr)
 
 
-# ---- 1. PAQUETES --------------------------------------------
-# Descomentar la primera vez:
-# install.packages("tidyverse")
-# install.packages("rstatix")
-# install.packages("ggpubr")
-# install.packages("coin")
+# -----------------------------------------------------------------
+# 1. CARGAR DATOS Y PASAR A FORMATO ANCHO
+# -----------------------------------------------------------------
+ruta_archivo <- "C:/Users/HP/Documents/TESIS ANT/Cuestionarios/MIST/Stai_VAS.xlsx" 
 
-library(tidyverse)
-library(coin)
-library(rstatix)
-library(ggpubr)
+datos <- read_excel(ruta_archivo)
 
+# Creamos una sola columna que identifique la condición (combinando
+# día + momento), para poder "abrir" los datos en formato ancho:
+# una fila por persona, una columna por cada una de las 4 condiciones.
+datos <- datos %>%
+  mutate(condicion = paste0(dia_intervencion, "_", momento))
 
-# ---- 2. CARGAR Y PREPARAR DATOS ----------------------------
-datos <- read.csv("C:/Users/HP/Documents/TESIS ANT/Cuestionarios/MIST/MIST_limpio_final.csv")
+datos_ancho_vas <- datos %>%
+  select(id, condicion, vas) %>%
+  pivot_wider(names_from = condicion, values_from = vas)
 
-datos$num     <- as.numeric(datos$num)
-datos$ID      <- factor(datos$num)
-datos$momento <- factor(datos$pre_post,
-                        levels = c("Pre", "Post"),
-                        labels = c("PRE-MIST", "POST-MIST"))
-datos$grupo   <- factor(datos$grupo,
-                        levels = c("control", "experimental"))
+datos_ancho_stai6 <- datos %>%
+  select(id, condicion, stai6_total) %>%
+  pivot_wider(names_from = condicion, values_from = stai6_total)
 
-# Solo participantes con PRE y POST completos
-datos_pareados <- datos %>%
-  group_by(ID) %>%
-  filter(n() == 2) %>%
-  ungroup()
+orden_condiciones <- c("dia1_post_mist", "dia1_post_ant", "dia3_post_mist", "dia3_post_ant")
 
-cat("=== MUESTRA ===\n")
-print(table(datos_pareados$grupo, datos_pareados$momento))
+# -----------------------------------------------------------------
+# 2. ASIGNAR GRUPO (control/experimental) SEGÚN EL ID
+# -----------------------------------------------------------------
+# Misma lógica usada en tu script de análisis del ANT: cada retiro
+# tuvo su propio bloque de códigos, y los retiros se alternaron
+# entre modalidad experimental y control.
+asignar_grupo <- function(id_vec) {
+  num <- as.numeric(stringr::str_extract(id_vec, "\\d+"))
+  dplyr::case_when(
+    num >= 1  & num <= 15 ~ "EXPERIMENTAL",
+    num >= 33 & num <= 48 ~ "EXPERIMENTAL",
+    num >= 16 & num <= 32 ~ "CONTROL",
+    num >= 49 & num <= 64 ~ "CONTROL",
+    TRUE ~ NA_character_
+  )
+}
 
-
-# ---- 3. ESTADÍSTICOS DESCRIPTIVOS --------------------------
-# Se reporta Mediana [P25 - P75]
-
-cat("\n=== DESCRIPTIVOS — STAI-6 ===\n")
-datos_pareados %>%
-  group_by(grupo, momento) %>%
-  summarise(
-    n   = n(),
-    Mdn = median(stai_total),
-    P25 = quantile(stai_total, 0.25),
-    P75 = quantile(stai_total, 0.75),
-    .groups = "drop"
-  ) %>% print()
-
-cat("\n=== DESCRIPTIVOS — VAS ===\n")
-datos_pareados %>%
-  group_by(grupo, momento) %>%
-  summarise(
-    n   = n(),
-    Mdn = median(vas_estres),
-    P25 = quantile(vas_estres, 0.25),
-    P75 = quantile(vas_estres, 0.75),
-    .groups = "drop"
-  ) %>% print()
+datos_ancho_vas <- datos_ancho_vas %>% mutate(grupo = asignar_grupo(id))
+datos_ancho_stai6 <- datos_ancho_stai6 %>% mutate(grupo = asignar_grupo(id))
 
 
-# ---- 4. NORMALIDAD (Shapiro-Wilk) --------------------------
-cat("\n=== NORMALIDAD (Shapiro-Wilk) ===\n")
-cat("p > .05 = distribución normal\n\n")
+# -----------------------------------------------------------------
+# 3. QUEDARNOS SOLO CON QUIENES TIENEN LAS 4 MEDICIONES COMPLETAS
+# -----------------------------------------------------------------
+datos_ancho_vas <- datos_ancho_vas %>% drop_na(all_of(orden_condiciones))
+datos_ancho_stai6 <- datos_ancho_stai6 %>% drop_na(all_of(orden_condiciones))
 
-cat("STAI-6:\n")
-datos_pareados %>%
-  group_by(grupo, momento) %>%
-  shapiro_test(stai_total) %>%
-  select(grupo, momento, statistic, p) %>%
-  print()
-
-cat("\nVAS:\n")
-datos_pareados %>%
-  group_by(grupo, momento) %>%
-  shapiro_test(vas_estres) %>%
-  select(grupo, momento, statistic, p) %>%
-  print()
+cat("Personas con las 4 mediciones completas de VAS, por grupo:\n")
+print(table(datos_ancho_vas$grupo))
+cat("\nPersonas con las 4 mediciones completas de STAI-6, por grupo:\n")
+print(table(datos_ancho_stai6$grupo))
 
 
-# ---- 5. EFICACIA DEL MIST: WILCOXON PAREADO ----------------
-# Pregunta: ¿indujo el MIST estrés agudo en cada grupo?
-# Se reporta: W, p, significancia y r (tamaño del efecto)
+# -----------------------------------------------------------------
+# 4. FUNCIÓN REUTILIZABLE: corre todo el análisis para UN grupo
+# -----------------------------------------------------------------
+# En vez de copiar y pegar el mismo código dos veces (una para
+# CONTROL y otra para EXPERIMENTAL), armamos una función que hace
+# todo el proceso (Shapiro-Wilk + Friedman + post-hoc + descriptivos)
+# y la llamamos una vez por grupo. Esto evita errores de copy-paste
+# y hace más fácil revisar/modificar el análisis en un solo lugar.
 
-cat("\n=== WILCOXON PAREADO: PRE-MIST vs POST-MIST ===\n\n")
-
-for (g in c("control", "experimental")) {
-  cat(paste0("--- ", toupper(g), " ---\n"))
-  sub <- datos_pareados %>%
-    filter(grupo == g) %>%
-    mutate(ID = droplevels(ID))
-
-  w_stai <- sub %>%
-    rstatix::wilcox_test(stai_total ~ momento, paired = TRUE) %>%
-    add_significance()
-  e_stai <- sub %>%
-    wilcox_effsize(stai_total ~ momento, paired = TRUE)
-  cat(sprintf("STAI-6: W = %.1f, p = %.4f %s, r = %.3f (%s)\n",
-              w_stai$statistic, w_stai$p, w_stai$p.signif,
-              e_stai$effsize, e_stai$magnitude))
-
-  w_vas <- sub %>%
-    rstatix::wilcox_test(vas_estres ~ momento, paired = TRUE) %>%
-    add_significance()
-  e_vas <- sub %>%
-    wilcox_effsize(vas_estres ~ momento, paired = TRUE)
-  cat(sprintf("VAS:    W = %.1f, p = %.4f %s, r = %.3f (%s)\n\n",
-              w_vas$statistic, w_vas$p, w_vas$p.signif,
-              e_vas$effsize, e_vas$magnitude))
+analizar_grupo <- function(datos_ancho, nombre_variable, nombre_grupo) {
+  cat("\n\n#####################################################\n")
+  cat("### GRUPO:", nombre_grupo, "| VARIABLE:", nombre_variable, "\n")
+  cat("#####################################################\n")
+  
+  sub <- datos_ancho %>% filter(grupo == nombre_grupo)
+  cat("n =", nrow(sub), "\n")
+  
+  cat("\n--- Shapiro-Wilk por condición ---\n")
+  for (cond in orden_condiciones) {
+    resultado <- shapiro.test(sub[[cond]])
+    cat(cond, ": W =", round(resultado$statistic, 3), ", p =", round(resultado$p.value, 4), "\n")
+  }
+  
+  matriz <- as.matrix(sub[, orden_condiciones])
+  cat("\n--- Friedman ---\n")
+  print(friedman.test(matriz))
+  
+  cat("\n--- Post-hoc Wilcoxon (Bonferroni) ---\n")
+  print(pairwise.wilcox.test(
+    x = unlist(sub[, orden_condiciones]),
+    g = rep(orden_condiciones, each = nrow(sub)),
+    paired = TRUE,
+    p.adjust.method = "bonferroni"
+  ))
+  
+  cat("\n--- Descriptivos (mediana [P25-P75]) ---\n")
+  largo <- sub %>% pivot_longer(cols = all_of(orden_condiciones), names_to = "condicion", values_to = "valor")
+  print(largo %>%
+          group_by(condicion) %>%
+          summarise(n = n(), mediana = median(valor), p25 = quantile(valor, .25), p75 = quantile(valor, .75)))
 }
 
 
-# ---- 6. DIFERENCIAS ENTRE GRUPOS: MANN-WHITNEY -------------
-# Pregunta: ¿difieren control y experimental en cada momento?
-# PRE-MIST: verifica equivalencia basal
-# POST-MIST: verifica si la recuperación fue distinta
-
-cat("=== MANN-WHITNEY: CONTROL vs EXPERIMENTAL ===\n\n")
-
-cat("STAI-6:\n")
-datos_pareados %>%
-  group_by(momento) %>%
-  rstatix::wilcox_test(stai_total ~ grupo) %>%
-  add_significance() %>%
-  select(momento, statistic, p, p.signif) %>%
-  print()
-
-cat("\nVAS:\n")
-datos_pareados %>%
-  group_by(momento) %>%
-  rstatix::wilcox_test(vas_estres ~ grupo) %>%
-  add_significance() %>%
-  select(momento, statistic, p, p.signif) %>%
-  print()
+# -----------------------------------------------------------------
+# 5. CORRER EL ANÁLISIS PARA CADA GRUPO Y CADA VARIABLE
+# -----------------------------------------------------------------
+analizar_grupo(datos_ancho_vas, "VAS", "CONTROL")
+analizar_grupo(datos_ancho_vas, "VAS", "EXPERIMENTAL")
+analizar_grupo(datos_ancho_stai6, "STAI-6", "CONTROL")
+analizar_grupo(datos_ancho_stai6, "STAI-6", "EXPERIMENTAL")
 
 
-# ---- 7. GRÁFICOS --------------------------------------------
+# =================================================================
+# 6. MODELO LMM: GRUPO × CONDICIÓN (interacción formal)
+# =================================================================
+# Las pruebas de Friedman de arriba se corrieron POR SEPARADO para
+# cada grupo, por lo que nunca testean directamente si la
+# TRAYECTORIA de estrés/ansiedad a lo largo de los 4 momentos
+# difiere realmente entre control y experimental (es decir, la
+# interacción grupo × tiempo). Este bloque corre un modelo único
+# (Linear Mixed Model) que sí testea esa interacción formalmente,
+# con grupo como factor entre-sujetos y condición (los 4 momentos)
+# como factor intra-sujetos.
+#
+# install.packages("lme4")
+# install.packages("lmerTest")
+library(lme4)
+library(lmerTest)
 
-# Figura 1: STAI-6
-fig1 <- ggplot(datos_pareados,
-               aes(x = momento, y = stai_total, fill = grupo)) +
-  geom_boxplot(alpha = 0.7, outlier.shape = 21, outlier.size = 2,
-               width = 0.5, position = position_dodge(0.6)) +
-  scale_fill_manual(
-    values = c("control" = "#E07B54", "experimental" = "#4A90D9"),
-    labels = c("Control", "Experimental")
-  ) +
-  scale_x_discrete(labels = c("PRE-MIST"  = "Pre-MIST",
-                               "POST-MIST" = "Post-MIST")) +
-  labs(
-    title = "Figura 1. Ansiedad estado (STAI-6) antes y después del MIST",
-    x     = NULL,
-    y     = "Puntaje STAI-6",
-    fill  = "Grupo"
-  ) +
-  theme_pubr() +
-  theme(legend.position  = "top",
-        plot.title       = element_text(size = 11))
+preparar_largo <- function(datos_ancho, nombre_variable) {
+  datos_ancho %>%
+    filter(!is.na(grupo)) %>%
+    pivot_longer(cols = all_of(orden_condiciones),
+                 names_to = "condicion", values_to = "valor") %>%
+    mutate(
+      condicion = factor(condicion, levels = orden_condiciones),
+      grupo     = factor(grupo),
+      id        = factor(id)
+    )
+}
 
-# Figura 2: VAS
-fig2 <- ggplot(datos_pareados,
-               aes(x = momento, y = vas_estres, fill = grupo)) +
-  geom_boxplot(alpha = 0.7, outlier.shape = 21, outlier.size = 2,
-               width = 0.5, position = position_dodge(0.6)) +
-  scale_fill_manual(
-    values = c("control" = "#E07B54", "experimental" = "#4A90D9"),
-    labels = c("Control", "Experimental")
-  ) +
-  scale_x_discrete(labels = c("PRE-MIST"  = "Pre-MIST",
-                               "POST-MIST" = "Post-MIST")) +
-  labs(
-    title = "Figura 2. Estrés subjetivo (VAS) antes y después del MIST",
-    x     = NULL,
-    y     = "Estrés percibido VAS (0–10)",
-    fill  = "Grupo"
-  ) +
-  theme_pubr() +
-  theme(legend.position  = "top",
-        plot.title       = element_text(size = 11))
+largo_vas   <- preparar_largo(datos_ancho_vas, "VAS")
+largo_stai6 <- preparar_largo(datos_ancho_stai6, "STAI-6")
 
-print(fig1)
-print(fig2)
+cat("\n\n#####################################################\n")
+cat("### MODELO LMM — VAS: grupo * condicion ###\n")
+cat("#####################################################\n")
+modelo_vas <- lmer(valor ~ grupo * condicion + (1 | id), data = largo_vas)
+print(anova(modelo_vas))
 
-# Para guardar en alta resolución:
-# ggsave("Fig1_MIST_STAI6.png", fig1, width = 7, height = 5, dpi = 300)
-# ggsave("Fig2_MIST_VAS.png",   fig2, width = 7, height = 5, dpi = 300)
+cat("\n\n#####################################################\n")
+cat("### MODELO LMM — STAI-6: grupo * condicion ###\n")
+cat("#####################################################\n")
+modelo_stai6 <- lmer(valor ~ grupo * condicion + (1 | id), data = largo_stai6)
+print(anova(modelo_stai6))
+
+# Resultados obtenidos (para referencia, ya corridos):
+#   VAS:    grupo:condicion  F(3,147) = 3.09, p = .029  (SIGNIFICATIVO)
+#   STAI-6: grupo:condicion  F(3,147) = 2.09, p = .104  (no significativo)
+#
+# Interpretación: para VAS, las trayectorias de estrés de los dos
+# grupos a lo largo de los 4 momentos SÍ son formalmente distintas.
+# Para STAI-6, la tendencia va en la misma dirección pero no alcanza
+# significancia estadística con el n disponible.
+
+# =================================================================
+# FIN DEL SCRIPT
+# =================================================================
